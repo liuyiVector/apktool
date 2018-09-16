@@ -1,5 +1,7 @@
 package cn.edu.pku.vector.utils;
 
+import com.sun.deploy.util.StringUtils;
+
 public class APKUtil {
     public static final String APKTOOL = "/usr/local/bin/apktool";
     public static boolean decompile(String apkPath, String targetFolder){
@@ -20,6 +22,16 @@ public class APKUtil {
                 "I: Copying original files..."))
             return true;
         return false;
+    }
+
+    public static String getLayoutPath(String pre, String name){
+        String[] tmps = pre.split("/");
+        tmps[tmps.length-1] = name+".xml";
+        return Utils.join(tmps, "/");
+    }
+
+    public static String getLayoutPathByFolder(String folder, String name){
+        return folder+"/res/layout/"+name+".xml";
     }
 
 

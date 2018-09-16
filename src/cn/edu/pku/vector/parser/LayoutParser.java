@@ -1,12 +1,11 @@
 package cn.edu.pku.vector.parser;
 
+import cn.edu.pku.vector.utils.APKUtil;
 import org.dom4j.Attribute;
 import org.dom4j.Element;
 
 import java.io.File;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.StreamSupport;
 
 public class LayoutParser extends BaseParser {
@@ -15,6 +14,9 @@ public class LayoutParser extends BaseParser {
 
     public Set<String> selfDefinedView;
 
+
+    public Map<String, Boolean> isWebView;
+
     public LayoutParser(String xmlPath) {
         super(xmlPath);
         selfDefinedView = new HashSet<>();
@@ -22,21 +24,32 @@ public class LayoutParser extends BaseParser {
     @Override
     public void parseNode(Element element){
         String name = element.getName();
-        if(name.contains("WebView")){
-            System.out.println(xmlPath + " " + name);
-        }
         if(name.contains(".")){
             //TODO 非relativelayout之类的控件，是第三方的控件或者自定义View
-            System.out.println("self-defined component: " + name);
             selfDefinedView.add(name);
+            if(isWebView.getOrDefault(name, false)){
+                System.out.println("webView: " + xmlPath + " " + name);
+                this.containWebView = true;
+            }
         }
+
+        if(name.contains("WebView")){
+            this.containWebView = true;
+            System.out.println("webView: " + xmlPath + " " + name);
+        }
+
         List<Attribute> attributes = element.attributes();
         for(Attribute attribute : attributes){
             String attName = attribute.getNamespacePrefix() + ":" + attribute.getName();
             String attValue = attribute.getText();
             //TODO 判断涉及到了drawable和layout的资源
             if(attValue.startsWith("@layout")){
-
+                //TODO 还依赖其他的页面，继续分析
+                String includePath = APKUtil.getLayoutPath(xmlPath, attValue.replace("@layout/",""));
+                LayoutParser layoutParser = new LayoutParser(includePath);
+                layoutParser.isWebView = isWebView;
+                layoutParser.parseNode(layoutParser.root);
+                this.containWebView |= layoutParser.containWebView;
             }
         }
 

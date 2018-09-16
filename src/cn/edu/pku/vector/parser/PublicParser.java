@@ -34,6 +34,10 @@ public class PublicParser {
 		    this.name = name;
         }
 
+        public String toString(){
+        	return type + " " + name + " " + id;
+		}
+
         @Override
         public boolean equals(Object o) {
             ResourceInfo target = (ResourceInfo) o;
@@ -50,7 +54,7 @@ public class PublicParser {
 		Element root;
 		Document document;
 		try {
-			document = reader.read(new File(apkFolder + "res/values/public.xml"));
+			document = reader.read(new File(apkFolder + "/res/values/public.xml"));
 			root = document.getRootElement();
 			List<Element> publics = root.elements("public");
 			for(int i = 0; i < publics.size();i++){
@@ -58,13 +62,16 @@ public class PublicParser {
 					//对于一些资源我们不需要考虑
 					continue;
 				}
-				ResourceInfo resourceInfo = new ResourceInfo();
-				resourceInfo.type = publics.get(i).attributeValue("type");
-				resourceInfo.name = publics.get(i).attributeValue("name");
-				resourceInfo.id = publics.get(i).attributeValue("id");
-				resourceInfo.size = 0;
-				resourceInfos.add(resourceInfo);
-                resourceInfoMap.put(resourceInfo.getAlias(),resourceInfo);
+				//这里我们只要获取layout
+				if("layout".equals(publics.get(i).attributeValue("type"))) {
+					ResourceInfo resourceInfo = new ResourceInfo();
+					resourceInfo.type = publics.get(i).attributeValue("type");
+					resourceInfo.name = publics.get(i).attributeValue("name");
+					resourceInfo.id = publics.get(i).attributeValue("id");
+					resourceInfo.size = 0;
+					resourceInfos.add(resourceInfo);
+					resourceInfoMap.put(resourceInfo.getAlias(), resourceInfo);
+				}
 			}
 			
 		} catch (DocumentException e) {

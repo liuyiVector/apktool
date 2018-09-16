@@ -1,5 +1,6 @@
 package cn.edu.pku.vector.parser;
 
+import cn.edu.pku.vector.utils.APKUtil;
 import cn.edu.pku.vector.utils.Utils;
 import com.googlecode.d2j.Field;
 import com.googlecode.d2j.Method;
@@ -10,31 +11,45 @@ import com.googlecode.d2j.node.DexMethodNode;
 import com.googlecode.d2j.reader.DexFileReader;
 import com.googlecode.d2j.reader.Op;
 import com.googlecode.d2j.visitors.DexCodeVisitor;
+import com.googlecode.d2j.visitors.DexMethodVisitor;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class DexParser {
 
-    public static List<String> activities = new ArrayList<>();
     public String packageName;
     public String apk;
-    HashMap<String, String> relationships;
+    public HashMap<String, String> relationships;
+    HashMap<String, PublicParser.ResourceInfo> layouts;
+    HashMap<String, List<PublicParser.ResourceInfo>> act2layouts;
+    List<String> activities;
+    String nowAct;
 
     public DexParser(String apk) {
         this.apk = apk;
         relationships = new HashMap<>();
-        processAPK();
     }
 
-    void processAPK(){
+
+    public HashMap<String, Boolean> getWebViews(){
+        HashMap<String, Boolean> isWebViews = new HashMap<>();
+        for(String key : relationships.keySet()){
+            if(isWebView(key)){
+                isWebViews.put(Utils.retransClassName(key), true);
+            }
+        }
+        return isWebViews;
+    }
+
+    void processAPK(HashMap<String, PublicParser.ResourceInfo> layouts, List<String> activities){
+        this.layouts = layouts;
+        this.activities = activities;
+        this.act2layouts = new HashMap<>();
         try {
             ZipInputStream zin = new ZipInputStream(new FileInputStream(apk));
             processZip(zin);
@@ -64,7 +79,14 @@ public class DexParser {
     void analyze(DexFileNode dfn){
         for(DexClassNode dcn : dfn.clzs){
             String parent = dcn.superClass;
+            //找到继承关系
             relationships.put(dcn.className, parent);
+            String nName = Utils.retransClassName(dcn.className);
+            if(activities.contains(nName)){
+                System.out.println(nName);
+                nowAct = nName;
+                getLayout(dcn);
+            }
         }
     }
 
@@ -77,6 +99,12 @@ public class DexParser {
             return name;
         }
         return getAncestor(relationships.get(name));
+    }
+
+
+    public boolean isWebView(String sdView){
+        String parent = getParent(sdView);
+        return "android.webkit.WebView".equals(parent);
     }
 
 
@@ -93,8 +121,16 @@ public class DexParser {
     }
 
 
+    class MyMethodVisitor extends DexMethodVisitor{
+        @Override
+        public DexCodeVisitor visitCode() {
+            return new MyCodeVisitor();
+        }
 
-    public static class MyCodeVisitor extends DexCodeVisitor{
+    }
+
+
+    class MyCodeVisitor extends DexCodeVisitor{
 
         @Override
         public void visitTypeStmt(Op op, int a, int b, String type) {
@@ -106,6 +142,15 @@ public class DexParser {
             super.visitConstStmt(op, ra, value);
             if (op == Op.CONST_CLASS) {
 
+            }else if(op == Op.CONST){
+                if(value instanceof Integer) {
+                    String id = "0x" + Integer.toHexString((Integer) value);
+                    if(layouts.containsKey(id)){
+                        List<PublicParser.ResourceInfo> list = act2layouts.getOrDefault(id, new ArrayList<>());
+                        list.add(layouts.get(id));
+                        act2layouts.put(nowAct, list);
+                    }
+                }
             }
         }
 
@@ -126,10 +171,40 @@ public class DexParser {
 
         List<DexFieldNode> dexFileNode = dcn.fields;
         List<DexMethodNode> dexMethodNodes = dcn.methods;
-
-
-
+        for(DexMethodNode dexMethodNode : dexMethodNodes){
+            dexMethodNode.accept(new MyMethodVisitor());
+        }
         return null;
+    }
+
+
+    public static void main(String[] args){
+        String testPath = "/Users/vector/Desktop/testFolder/com.douban.movie";
+        DexParser dexParser = new DexParser(testPath+".apk");
+        List<PublicParser.ResourceInfo> resourceInfos = PublicParser.getResourceInfo(testPath);
+        HashMap<String, PublicParser.ResourceInfo> layoutMaps = new HashMap<>();
+        for(PublicParser.ResourceInfo resourceInfo : resourceInfos){
+            layoutMaps.put(resourceInfo.id, resourceInfo);
+        }
+
+        List<String> activities = ManifestParser.getActivities(testPath);
+        dexParser.processAPK(layoutMaps, activities);
+        HashMap<String, List<PublicParser.ResourceInfo>> act2layouts = dexParser.act2layouts;
+        HashMap<String, Boolean> isWebViews = dexParser.getWebViews();
+
+
+        for(String key : act2layouts.keySet()){
+            List<PublicParser.ResourceInfo> list = act2layouts.get(key);
+            for(PublicParser.ResourceInfo resourceInfo : list){
+                String path = APKUtil.getLayoutPathByFolder(testPath, resourceInfo.name);
+                LayoutParser parser = new LayoutParser(path);
+                parser.isWebView = isWebViews;
+                parser.parseNode(parser.root);
+                if(parser.containWebView){
+                    System.out.println(key + " has WebView");
+                }
+            }
+        }
     }
 
 
