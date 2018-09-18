@@ -13,6 +13,7 @@ import com.googlecode.d2j.reader.Op;
 import com.googlecode.d2j.visitors.DexCodeVisitor;
 import com.googlecode.d2j.visitors.DexMethodVisitor;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -179,7 +180,9 @@ public class DexParser {
 
 
     public static void main(String[] args){
-        String testPath = "/Users/vector/Desktop/testFolder/com.douban.movie";
+        //String testPath = "/Users/vector/Desktop/testFolder/com.douban.movie";
+        String testPath = "/Users/vector/Desktop/testFolder/com.zongheng.reader";
+        String layoutPath = testPath + "/res/layout/";
         DexParser dexParser = new DexParser(testPath+".apk");
         List<PublicParser.ResourceInfo> resourceInfos = PublicParser.getResourceInfo(testPath);
         HashMap<String, PublicParser.ResourceInfo> layoutMaps = new HashMap<>();
@@ -193,14 +196,36 @@ public class DexParser {
         HashMap<String, Boolean> isWebViews = dexParser.getWebViews();
 
 
+        HashMap<String, Boolean> layout2WebView = new HashMap<>();
+
+
+
+        //get layouts that contain WebView
+        File file = new File(layoutPath);
+        if(file.isDirectory()){
+            String[] items = file.list();
+            for(String item : items){
+                if(item.endsWith(".xml")){
+                    String target = layoutPath + File.separator + item;
+                    LayoutParser parser = new LayoutParser(target);
+                    parser.isWebView = isWebViews;
+                    parser.parseNode(parser.root);
+                    if(parser.containWebView){
+                        System.out.println(item + " has WebView");
+                        layout2WebView.put(item, true);
+                    }else{
+                        layout2WebView.put(item, false);
+                    }
+                }
+            }
+        }
+
+
+        //get activities that contain WebView, but it is insufficient to figure out layouts that an activity contains
         for(String key : act2layouts.keySet()){
             List<PublicParser.ResourceInfo> list = act2layouts.get(key);
             for(PublicParser.ResourceInfo resourceInfo : list){
-                String path = APKUtil.getLayoutPathByFolder(testPath, resourceInfo.name);
-                LayoutParser parser = new LayoutParser(path);
-                parser.isWebView = isWebViews;
-                parser.parseNode(parser.root);
-                if(parser.containWebView){
+                if(layout2WebView.getOrDefault(resourceInfo.name+".xml", false)){
                     System.out.println(key + " has WebView");
                 }
             }
