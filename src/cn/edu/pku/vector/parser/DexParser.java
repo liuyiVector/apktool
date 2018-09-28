@@ -178,10 +178,7 @@ public class DexParser {
         return null;
     }
 
-
-    public static void main(String[] args){
-        //String testPath = "/Users/vector/Desktop/testFolder/com.douban.movie";
-        String testPath = "/Users/vector/Desktop/testFolder/com.zongheng.reader";
+    private static void parseWebViewInfo(String testPath) {
         String layoutPath = testPath + "/res/layout/";
         DexParser dexParser = new DexParser(testPath+".apk");
         List<PublicParser.ResourceInfo> resourceInfos = PublicParser.getResourceInfo(testPath);
@@ -199,7 +196,6 @@ public class DexParser {
         HashMap<String, Boolean> layout2WebView = new HashMap<>();
 
 
-
         //get layouts that contain WebView
         File file = new File(layoutPath);
         if(file.isDirectory()){
@@ -211,6 +207,7 @@ public class DexParser {
                     parser.isWebView = isWebViews;
                     parser.parseNode(parser.root);
                     if(parser.containWebView){
+                        //包含WebView的layout
                         System.out.println(item + " has WebView");
                         layout2WebView.put(item, true);
                     }else{
@@ -226,10 +223,17 @@ public class DexParser {
             List<PublicParser.ResourceInfo> list = act2layouts.get(key);
             for(PublicParser.ResourceInfo resourceInfo : list){
                 if(layout2WebView.getOrDefault(resourceInfo.name+".xml", false)){
+                    //包含WebView的Activity
                     System.out.println(key + " has WebView");
                 }
             }
         }
+    }
+
+    public static void main(String[] args){
+        //String testPath = "/Users/vector/Desktop/testFolder/com.douban.movie";
+        String testPath = "/Users/vector/Desktop/testFolder/com.zongheng.reader";
+        parseWebViewInfo(testPath);
     }
 
 
